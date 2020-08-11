@@ -303,6 +303,23 @@ TRITONSERVER_Error* CopyBuffer(
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used);
 
+/// Does a file or directory exist?
+/// \param path The path to check for existance.
+/// \param exists Returns true if file/dir exists
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* FileExists(const std::string& path, bool* exists);
+
+/// Is a path a directory?
+/// \param path The path to check.
+/// \param is_dir Returns true if path represents a directory
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_Error* IsDirectory(const std::string& path, bool* is_dir);
+
+/// Join path segments into a longer path
+/// \param segments The path segments.
+/// \return the path formed by joining the segments.
+std::string JoinPath(std::initializer_list<std::string> segments);
+
 /// Returns the content in the model version path and the path to the content as
 /// key-value pair.
 /// \param model_repository_path The path to the model repository.

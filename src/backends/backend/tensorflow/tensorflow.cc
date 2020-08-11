@@ -52,15 +52,6 @@ namespace nib = nvidia::inferenceserver::backend;
 
 namespace {
 
-#define THROW_IF_BACKEND_MODEL_ERROR(X)            \
-  do {                                             \
-    TRITONSERVER_Error* tie_err__ = (X);           \
-    if (tie_err__ != nullptr) {                    \
-      throw nib::BackendModelException(tie_err__); \
-    }                                              \
-  } while (false)
-
-
 #ifndef TRITON_ENABLE_GPU
 using cudaStream_t = void*;
 #endif  // !TRITON_ENABLE_GPU
@@ -2195,12 +2186,6 @@ TRITONBACKEND_ModelInstanceExecute(
   // this function. If something does go wrong in processing a
   // particular request then we send an error response just for the
   // specific request.
-
-  // Note that access to 'requests' will be invalidated once
-  // TRITONBACKEND_ModelInstanceExecute returns. If requests need to be
-  // referred after TRITONBACKEND_ModelInstanceExecute returns, i.e. in
-  // non-blocking model, the request array must be copied to a instance
-  // owned buffer.
   instance_state->ProcessRequests(requests, request_count);
 
   return nullptr;  // success

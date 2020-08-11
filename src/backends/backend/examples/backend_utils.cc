@@ -28,6 +28,8 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <cerrno>
 
 namespace nvidia { namespace inferenceserver { namespace backend {
 
@@ -556,6 +558,15 @@ GetDirectoryContents(const std::string& path, std::set<std::string>* contents)
   return nullptr;  // success
 }
 
+}  // namespace
+
+TRITONSERVER_Error*
+FileExists(const std::string& path, bool* exists)
+{
+  *exists = (access(path.c_str(), F_OK) == 0);
+  return nullptr;  // success
+}
+
 TRITONSERVER_Error*
 IsDirectory(const std::string& path, bool* is_dir)
 {
@@ -596,8 +607,6 @@ JoinPath(std::initializer_list<std::string> segments)
 
   return joined;
 }
-
-}  // namespace
 
 TRITONSERVER_Error*
 ModelPaths(
@@ -640,6 +649,7 @@ ModelPaths(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(model_path));
   }
+
   return nullptr;  // success
 }
 
