@@ -42,6 +42,13 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+else
+    LEAKCHECK=/usr/bin/valgrind
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+fi
+
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tritonserver/bin/tritonserver
@@ -200,7 +207,16 @@ for model_trial in v 0 1 2 4; do
             test_no_correlation_id ; do
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-        run_server
+        
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            SERVER_TIMEOUT=720
+            LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+            run_server_leakcheck
+        else  
+            run_server
+        fi
+        
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
@@ -227,6 +243,17 @@ for model_trial in v 0 1 2 4; do
 
         kill $SERVER_PID
         wait $SERVER_PID
+
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+
+            DEF_LOST_RECORDS=$(grep "are definitely lost" -A 10 $LEAKCHECK_LOG | awk 'BEGIN{RS="--"} !(/cnmem/||/NewSession\(tensorflow/) {print}')
+     
+            if [ -n "$DEF_LOST_RECORDS" ]; then
+                echo -e "$DEF_LOST_RECORDS"
+                echo -e "\n***\n*** Test FAILED\n***"
+                RET=1
+            fi
+        fi
     done
 
     # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
@@ -254,7 +281,16 @@ for model_trial in v 0 1 2 4; do
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-        run_server
+        
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+            SERVER_TIMEOUT=720
+            LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+            LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+            run_server_leakcheck
+        else  
+            run_server
+        fi
+        
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
             cat $SERVER_LOG
@@ -283,6 +319,17 @@ for model_trial in v 0 1 2 4; do
         unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
+
+        if [ "$TEST_VALGRIND" -eq 1 ]; then
+
+            DEF_LOST_RECORDS=$(grep "are definitely lost" -A 10 $LEAKCHECK_LOG | awk 'BEGIN{RS="--"} !(/cnmem/||/NewSession\(tensorflow/) {print}')
+     
+            if [ -n "$DEF_LOST_RECORDS" ]; then
+                echo -e "$DEF_LOST_RECORDS"
+                echo -e "\n***\n*** Test FAILED\n***"
+                RET=1
+            fi
+        fi
     done
 done
 
@@ -308,7 +355,16 @@ if [[ $BACKENDS == *"custom"* ]]; then
 
       SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
       SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-      run_server
+      
+      if [ "$TEST_VALGRIND" -eq 1 ]; then
+          SERVER_TIMEOUT=720
+          LEAKCHECK_LOG="./$i.$MODEL_DIR.valgrind.log"
+          LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+          run_server_leakcheck
+      else  
+          run_server
+      fi
+      
       if [ "$SERVER_PID" == "0" ]; then
           echo -e "\n***\n*** Failed to start $SERVER\n***"
           cat $SERVER_LOG
@@ -337,6 +393,17 @@ if [[ $BACKENDS == *"custom"* ]]; then
       unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
       kill $SERVER_PID
       wait $SERVER_PID
+
+      if [ "$TEST_VALGRIND" -eq 1 ]; then
+
+          DEF_LOST_RECORDS=$(grep "are definitely lost" -A 10 $LEAKCHECK_LOG | awk 'BEGIN{RS="--"} !(/cnmem/||/NewSession\(tensorflow/) {print}')
+    
+          if [ -n "$DEF_LOST_RECORDS" ]; then
+              echo -e "$DEF_LOST_RECORDS"
+              echo -e "\n***\n*** Test FAILED\n***"
+              RET=1
+          fi
+      fi
   done
 fi
 

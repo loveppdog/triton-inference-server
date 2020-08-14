@@ -49,6 +49,14 @@ if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
     TEST_CUDA_SHARED_MEMORY="0"
 fi
 
+if [ -z "$TEST_VALGRIND" ]; then
+    TEST_VALGRIND="0"
+else
+    LEAKCHECK_LOG_BASE="./valgrind_test"
+    LEAKCHECK=/usr/bin/valgrind
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+fi
+
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS="29"
 fi
@@ -173,7 +181,16 @@ for TARGET in cpu gpu; do
               sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
     fi
 
-    run_server
+    # Check if running a memory leak check
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        SERVER_TIMEOUT=720
+        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else  
+        run_server
+    fi
+
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -201,6 +218,18 @@ for TARGET in cpu gpu; do
 
     kill $SERVER_PID
     wait $SERVER_PID
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+
+        DEF_LOST_RECORDS=$(grep "are definitely lost" -A 10 $LEAKCHECK_LOG | awk 'BEGIN{RS="--"} !(/cnmem/||/NewSession\(tensorflow/) {print}')
+     
+        if [ -n "$DEF_LOST_RECORDS" ]; then
+            echo -e "$DEF_LOST_RECORDS"
+            echo -e "\n***\n*** Test FAILED\n***"
+            RET=1
+        fi
+    fi
+    
 done
 
 if [ $RET -eq 0 ]; then
